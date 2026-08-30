@@ -19,6 +19,7 @@ import pandas as pd
 
 from src import action_engine, database, decomposition_engine, evidence_engine
 from src import evidence_fusion, guardrails_engine, narrator, orchestrator, retrieval
+from src import feedback_engine
 from src.contracts import KpiContract, detect_formula_operator, load_contracts
 from src.driver_discovery import (
     assert_no_incident_leakage,
@@ -543,6 +544,8 @@ def run_pipeline() -> None:
 def _process_changepoint(
     kpi: str, region: str, changepoint_date: dt.date, contract: KpiContract
 ) -> None:
+    analysis_started_at = dt.datetime.utcnow()
+
     operator = detect_formula_operator(contract.formula)
 
     windows = discover_candidates(kpi, region, changepoint_date, contract)
@@ -837,6 +840,16 @@ def _process_changepoint(
         ),
         kpi_relative_change=relative_change,
     )
+
+    # --- Feedback calibration (downstream-only) ---
+    action_context = feedback_engine.apply_feedback_to_action_context(
+        kpi=kpi,
+        region=region,
+        window_start=changepoint_date,
+        action_context=action_context,
+        analysis_started_at=analysis_started_at,
+    )
+    packet["feedback_calibration"] = action_context.get("feedback_calibration", {})
     packet["action_context"] = action_context
     packet["recommended_action"] = action_context["recommended_action"]
     _persist_decision_packet(packet)

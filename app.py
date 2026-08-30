@@ -27,7 +27,7 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 import streamlit as st
 
-from src import repository
+from src import feedback_engine, repository
 
 try:  # Optional dependency. The UI still works without Plotly.
     import plotly.graph_objects as go
@@ -1870,16 +1870,96 @@ def render_runtime_audit_log() -> None:
     st.dataframe(telemetry, use_container_width=True, hide_index=True)
 
 
-def render_feedback(role: str, region: str) -> None:
-    render_section_header("Feedback", "Feedback is stored separately from the analytical evidence and does not alter the current RCA result.")
+def render_feedback(data: DashboardData, role: str, kpi: str, region: str) -> None:
+    render_section_header(
+        "Feedback",
+        "Feedback is stored with the current decision context and may calibrate future action readiness. It never rewrites deterministic RCA evidence.",
+    )
+
+    bundle: dict[str, Any] = {}
+    bundles = data.get("evidence_bundle", pd.DataFrame())
+    if not bundles.empty:
+        raw = bundles.iloc[-1].get("bundle_json")
+        if isinstance(raw, dict):
+            bundle = raw
+        else:
+            try:
+                parsed = json.loads(raw) if raw else {}
+                bundle = parsed if isinstance(parsed, dict) else {}
+            except (TypeError, json.JSONDecodeError):
+                bundle = {}
+
+    decision = bundle.get("decision", {}) if isinstance(bundle.get("decision"), dict) else {}
+    action = decision.get("action_context", {}) if isinstance(decision.get("action_context"), dict) else {}
+    calibration = action.get("feedback_calibration", {}) if isinstance(action.get("feedback_calibration"), dict) else {}
+
+    if calibration:
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            render_metric_card(
+                "Feedback samples",
+                str(int(calibration.get("sample_count", 0) or 0)),
+                note="Eligible historical ratings used for this decision pattern.",
+            )
+        with c2:
+            adjustment = float(calibration.get("adjustment", 0.0) or 0.0)
+            render_metric_card(
+                "Readiness adjustment",
+                f"{adjustment:+.1%}",
+                note="Bounded to ±10 percentage points before shrinkage.",
+            )
+        with c3:
+            adjusted = float(calibration.get("adjusted_readiness_score", 0.0) or 0.0)
+            render_metric_card(
+                "Adjusted readiness",
+                f"{adjusted:.0%}",
+                note="Operational calibration only; evidence confidence is unchanged.",
+            )
+
+    window_start = decision.get("window_start") or bundle.get("window_start")
+    primary_driver = action.get("primary_driver")
+    action_level = action.get("action_level")
+
+    if not window_start or not action_level:
+        render_callout(
+            "Feedback context unavailable",
+            "A completed decision packet is required before contextual feedback can be recorded.",
+            tone="warning",
+            icon="!",
+        )
+        return
+
     with st.form("feedback_form", clear_on_submit=True):
-        disposition = st.radio("Was this analysis useful?", ["Helpful", "Not helpful", "Unclear"], horizontal=True)
-        comment = st.text_area("Comments (optional)", placeholder="What was clear, missing, or misleading?", max_chars=2000)
+        disposition = st.radio(
+            "Was this analysis useful?",
+            ["Helpful", "Not helpful", "Unclear"],
+            horizontal=True,
+        )
+        comment = st.text_area(
+            "Comments (optional)",
+            placeholder="What was clear, missing, or misleading?",
+            max_chars=2000,
+        )
         submitted = st.form_submit_button("Submit feedback", type="primary")
         if submitted:
             try:
-                repository.save_feedback(role, region, disposition, comment)
-                render_callout("Feedback recorded", "Thank you. The feedback was stored successfully.", tone="success", icon="✓")
+                feedback_engine.record_feedback(
+                    persona=role,
+                    region=region,
+                    kpi=kpi,
+                    window_start=window_start,
+                    primary_driver=str(primary_driver) if primary_driver else None,
+                    action_level=str(action_level),
+                    disposition=disposition,
+                    comment=comment,
+                    is_demo=False,
+                )
+                render_callout(
+                    "Feedback recorded",
+                    "Thank you. The rating will be eligible for bounded calibration on a future pipeline/feedback-refresh run.",
+                    tone="success",
+                    icon="✓",
+                )
             except Exception as exc:
                 render_callout("Feedback could not be recorded", str(exc), tone="danger", icon="!")
 
@@ -1891,7 +1971,7 @@ def render_system_health(data: DashboardData, role: str, kpi: str, region: str) 
         render_analysis_audit_snapshot(data)
     with right:
         render_runtime_audit_log()
-    render_feedback(role, region)
+    render_feedback(data, role, kpi, region)
 
 
 # =============================================================================

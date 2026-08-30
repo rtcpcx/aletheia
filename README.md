@@ -2,15 +2,15 @@
 
 > **Governed Decision Intelligence for Business KPI Root-Cause Analysis**
 
-Aletheia is an explainable business decision-intelligence system that detects meaningful KPI shifts, decomposes those shifts into business components, evaluates plausible drivers using temporally safe statistical evidence, applies source-health and uncertainty guardrails, and selectively invokes external intelligence only when it can meaningfully discriminate between already-supported hypotheses.
+Aletheia is an explainable business decision-intelligence system that detects meaningful KPI shifts, decomposes those shifts into business components, evaluates plausible drivers using temporally safe statistical evidence, applies source-health and uncertainty guardrails, selectively invokes external intelligence only when it can meaningfully discriminate between already-supported hypotheses, and uses historical user feedback as a bounded downstream calibration of action readiness without rewriting deterministic RCA evidence.
 
 The core design principle is simple:
 
 > **LLMs and external retrieval may enrich interpretation, but they must never overwrite deterministic business evidence.**
 
 
-Project repository and issue-tracker links should be added here immediately after
-the GitHub repository is created.
+**Repository:** [github.com/rtcpc/aletheia](https://github.com/rtcpc/aletheia)  
+**Issues:** [GitHub Issues](https://github.com/rtcpc/aletheia/issues)
 
 ## Table of contents
 
@@ -18,6 +18,7 @@ the GitHub repository is created.
 - [Architecture](#architecture)
 - [Core analytical flow](#core-analytical-flow)
 - [Analytical methodology](#1-kpi-contracts)
+- [Governed feedback calibration](#14-governed-feedback-calibration)
 - [Benchmark](#benchmark)
 - [Current validated development benchmark](#current-validated-development-benchmark)
 - [Repository structure](#repository-structure)
@@ -31,6 +32,7 @@ the GitHub repository is created.
 - [Run evaluation](#run-evaluation)
 - [Launch the application](#launch-the-application)
 - [Feedback](#feedback)
+- [Feedback demonstration](#feedback-demonstration)
 - [Governance principles](#governance-principles)
 - [Troubleshooting and FAQ](#troubleshooting-and-faq)
 - [Development utilities](#development-utilities)
@@ -39,7 +41,7 @@ the GitHub repository is created.
 
 ---
 
-### What problem does Aletheia solve?
+## What problem does Aletheia solve?
 
 Traditional dashboards answer:
 
@@ -70,25 +72,39 @@ flowchart TD
     A[Raw Business Sources] --> B[Deterministic KPI Mart]
     B --> C[Changepoint Detection]
     C --> D[Candidate Driver Discovery]
+
     D --> E[Lag-Aware Historical Evidence]
     D --> F[Structural-Break Evidence]
     E --> G[Evidence Calibration & Ranking]
     F --> G
+
     G --> H[Exact KPI Decomposition]
     H --> I[Source Health + Guardrails]
-    I --> J[Decision / Action Engine]
+    I --> J[Base Decision Packet]
+
     J --> K{External verification useful?}
-    K -->|No| L[Deterministic / Internal Decision]
-    K -->|Yes| M[Stage-4 External Intelligence]
-    M --> N[Grounded Web Retrieval]
-    N --> O[Source Relevance Scoring]
-    O --> P[Bounded Evidence Fusion]
-    P --> Q[Evidence Bundle]
-    L --> Q
-    Q --> R[Persona Narration]
-    R --> S[Streamlit Decision Interface]
-    S --> T[User Feedback]
+    K -->|No| P[Final Deterministic Action Context]
+    K -->|Yes| L[Stage-4 External Intelligence]
+    L --> M[Grounded Web Retrieval]
+    M --> N[Source Relevance Scoring]
+    N --> O[Bounded Retrieval Fusion]
+    O --> P
+
+    P --> Q[Feedback Engine]
+    HF[(Historical User Feedback)] --> Q
+    Q --> R[Bounded Action-Readiness Calibration]
+
+    R --> S[Evidence Bundle]
+    S --> T[Persona Narration]
+    T --> U[Streamlit Decision Interface]
+
+    U --> V[New Contextual User Feedback]
+    V --> HF
+
+    Q -. governance invariant .-> W[No change to changepoints, lags, driver evidence, decomposition, retrieval routing or recommendation identity]
 ```
+
+The feedback loop is intentionally **downstream-only**. Deterministic business evidence determines the explanation and recommendation; historical feedback can only calibrate the separate operational-readiness score attached to that decision.
 
 ---
 
@@ -100,13 +116,18 @@ flowchart LR
     B --> C[Discover allowed drivers]
     C --> D[Select lag on historical-only data]
     D --> E[Evaluate incident activation]
-    E --> F[Rank evidence]
+    E --> F[Rank deterministic evidence]
     F --> G[Decompose KPI change]
     G --> H[Apply source-health guardrails]
-    H --> I[Generate action state]
-    I --> J[Optional Stage-4 retrieval]
-    J --> K[Evidence bundle + narration]
+    H --> I[Build base decision]
+    I --> J[Optional Stage-4 verification]
+    J --> K[Build final deterministic action context]
+    K --> L[Load eligible historical feedback]
+    L --> M[Bounded readiness calibration]
+    M --> N[Evidence bundle + narration]
 ```
+
+Feedback is never used to discover a driver, select a lag, fit a model, change decomposition, authorize web retrieval, or manufacture an action.
 
 ---
 
@@ -354,6 +375,153 @@ Implementation: `src/narrator.py`
 
 ---
 
+## 14. Governed feedback calibration
+
+Aletheia includes an implemented feedback engine in `src/feedback_engine.py`.
+
+The purpose of this layer is **not** to teach the RCA engine which explanation users prefer. Instead, it uses prior user experience to make the operational-readiness signal slightly more or less conservative while leaving analytical facts unchanged.
+
+### Matching logic
+
+Historical feedback is eligible when it matches the current:
+
+```text
+KPI
+primary driver
+action level
+```
+
+Same-region feedback receives full weight:
+
+```text
+weight = 1.0
+```
+
+Comparable feedback from another region receives reduced weight:
+
+```text
+weight = 0.5
+```
+
+This allows cautious transfer across regions without treating all operational contexts as identical.
+
+### Disposition mapping
+
+```text
+Helpful      = +1
+Unclear      =  0
+Not helpful  = -1
+```
+
+The reliability term shrinks small samples toward a no-op:
+
+```text
+reliability = effective_sample_size / (effective_sample_size + 5)
+```
+
+The final feedback adjustment is bounded:
+
+```text
+adjustment =
+    clamp(
+        0.10 × weighted_mean × reliability,
+        -0.10,
+        +0.10
+    )
+```
+
+So even a large volume of unanimous feedback can move action readiness by at most **±10 percentage points**.
+
+### Base readiness by deterministic action state
+
+```text
+act                  0.85
+validate             0.60
+validate_unexplained 0.45
+monitor              0.35
+data_quality_first   0.20
+```
+
+Then:
+
+```text
+adjusted_readiness =
+    clamp(base_readiness + feedback_adjustment, 0, 1)
+```
+
+### What feedback can and cannot change
+
+Feedback **can change**:
+
+```text
+feedback sample count
+feedback weighted mean
+feedback reliability
+feedback adjustment
+adjusted action-readiness score
+```
+
+Feedback **cannot change**:
+
+```text
+detected changepoint
+selected lag
+driver evidence
+driver ranking
+historical coefficient
+p-value
+decomposition
+source-health result
+Stage-4 retrieval authorization
+retrieval support
+primary driver
+action level
+recommended action
+```
+
+The enriched audit object is stored under:
+
+```text
+decision.action_context.feedback_calibration
+```
+
+### Temporal and failure-safety rules
+
+Only feedback created **strictly before** the current analysis/refresh execution is eligible. The cutoff is compared to MySQL `TIMESTAMP` values through an absolute Unix timestamp so the rule remains correct across database/session timezones.
+
+If the feedback store is unavailable, the feedback layer fails closed to an exact no-op. Deterministic RCA therefore remains usable even when feedback storage is unavailable.
+
+### Demo isolation
+
+Synthetic demonstration rows are stored with:
+
+```text
+is_demo = 1
+```
+
+They are excluded by default.
+
+They are consumed only when the evaluator explicitly enables:
+
+```powershell
+$env:ALETHEIA_FEEDBACK_INCLUDE_DEMO="1"
+```
+
+This prevents demonstration data from silently influencing ordinary runs.
+
+Implementation:
+
+```text
+src/feedback_engine.py
+sql/05_feedback_integration.sql
+data/generate_feedback_demo.py
+refresh_feedback_calibration.py
+eval/test_feedback_integration.py
+eval/validate_feedback_integration.py
+```
+
+---
+
 ## Benchmark
 
 Aletheia includes a reproducible semi-synthetic benchmark: **Aletheia Business RCA Benchmark v1.0**.
@@ -422,12 +590,14 @@ Ground truth is generated only under benchmark outputs and must never be importe
 | Action-language inconsistencies | **0** |
 | Stage-4 policy failures | **0** |
 
-Latest regression suite:
+Validated regression coverage:
 
 ```text
-44 tests
-44 passed
+Core pre-feedback regression baseline: 44 / 44 passing
+Feedback integration unit suite:       10 / 10 passing
 ```
+
+The feedback integration was also validated against the stored deterministic snapshot: positive and negative feedback changed only downstream readiness while driver evidence and decomposition remained unchanged.
 
 These are development benchmark results, not general real-world accuracy guarantees.
 
@@ -448,13 +618,16 @@ aletheia/
 |
 |-- data/
 |   |-- generate_benchmark_data.py
+|   |-- generate_feedback_demo.py
 |   |-- load_benchmark_into_mysql.py
-|   `-- generated/                # local, reproducible, gitignored
+|   `-- generated/                  # local, reproducible, gitignored
 |
 |-- eval/
 |   |-- validate_against_truth.py
 |   |-- validate_action_language.py
+|   |-- validate_feedback_integration.py
 |   |-- validate_stage4_policy.py
+|   |-- test_feedback_integration.py
 |   `-- test_*.py
 |
 |-- sql/
@@ -462,6 +635,7 @@ aletheia/
 |   |-- 02_benchmark_views.sql
 |   |-- 03_analysis_schema.sql
 |   |-- 04_operations_schema.sql
+|   |-- 05_feedback_integration.sql
 |   `-- 99_benchmark_verify.sql
 |
 |-- src/
@@ -472,6 +646,7 @@ aletheia/
 |   |-- driver_discovery.py
 |   |-- evidence_engine.py
 |   |-- evidence_fusion.py
+|   |-- feedback_engine.py
 |   |-- guardrails_engine.py
 |   |-- narrator.py
 |   |-- orchestrator.py
@@ -484,6 +659,7 @@ aletheia/
 |
 |-- app.py
 |-- refresh_decision_language.py
+|-- refresh_feedback_calibration.py
 |-- refresh_stage4_policy.py
 |-- requirements.txt
 |-- .env.example
@@ -602,6 +778,14 @@ ALETHEIA_LLM_MODEL
 OLLAMA_HOST
 ```
 
+Optional evaluator-only flag:
+
+```text
+ALETHEIA_FEEDBACK_INCLUDE_DEMO
+```
+
+`ALETHEIA_FEEDBACK_INCLUDE_DEMO` defaults to disabled and should only be enabled when intentionally running the synthetic feedback demonstration.
+
 Example PowerShell session:
 
 ```powershell
@@ -651,28 +835,52 @@ These files are reproducible and intentionally excluded from Git.
 
 ## Initialize MySQL
 
+Create the benchmark, analysis, operational, and feedback-integration schemas.
+
+### Windows PowerShell
+
+PowerShell itself does not handle native `<` redirection consistently, so use `cmd /c`:
+
+```powershell
+cmd /c "mysql -u root -p < sql\01_benchmark_schema.sql"
+cmd /c "mysql -u root -p < sql\02_benchmark_views.sql"
+cmd /c "mysql -u root -p < sql\03_analysis_schema.sql"
+cmd /c "mysql -u root -p < sql\04_operations_schema.sql"
+cmd /c "mysql -u root -p < sql\05_feedback_integration.sql"
+```
+
+### macOS / Linux
+
 ```bash
 mysql -u root -p < sql/01_benchmark_schema.sql
 mysql -u root -p < sql/02_benchmark_views.sql
 mysql -u root -p < sql/03_analysis_schema.sql
 mysql -u root -p < sql/04_operations_schema.sql
+mysql -u root -p < sql/05_feedback_integration.sql
 ```
 
-On Windows PowerShell:
+`sql/05_feedback_integration.sql` is idempotent. It extends `app.user_feedback` with decision context (`kpi`, `window_start`, `primary_driver`, `action_level`) plus the `is_demo` flag and the lookup index used by the feedback engine.
+
+Verify the feedback schema:
 
 ```powershell
-Get-Content .\sql_benchmark_schema.sql -Raw | mysql -u root -p
-Get-Content .\sql_benchmark_views.sql -Raw | mysql -u root -p
-Get-Content .\sql_analysis_schema.sql -Raw | mysql -u root -p
-Get-Content .\sql_operations_schema.sql -Raw | mysql -u root -p
+mysql -u root -p app -e "DESCRIBE user_feedback;"
 ```
 
 ---
 
 ## Load benchmark data
 
+Load DEV:
+
 ```bash
-python data/load_benchmark_into_mysql.py
+python data/load_benchmark_into_mysql.py --split dev
+```
+
+Load HOLDOUT only when intentionally performing the frozen holdout evaluation:
+
+```bash
+python data/load_benchmark_into_mysql.py --split holdout
 ```
 
 ---
@@ -689,12 +897,37 @@ The full pipeline can take several minutes because narration and retrieval scori
 
 ## Run evaluation
 
+### Core benchmark and policy validators
+
 ```bash
 python -m eval.validate_against_truth
 python -m eval.validate_action_language
 python -m eval.validate_stage4_policy
+```
+
+### Feedback integration tests
+
+```bash
+python -m unittest eval.test_feedback_integration -v
+```
+
+### Full unit-test discovery
+
+```bash
 python -m unittest discover -s eval -p "test_*.py" -v
 ```
+
+The feedback suite specifically checks:
+
+- no-feedback exact no-op behavior;
+- positive and negative readiness movement;
+- ±10 percentage-point bounding;
+- demo-feedback exclusion by default;
+- contextual, parameterized feedback persistence;
+- temporal cutoff handling;
+- timezone-safe MySQL `TIMESTAMP` comparison;
+- feedback-store failure as a no-op;
+- preservation of deterministic action identity.
 
 ---
 
@@ -714,17 +947,309 @@ The UI provides:
 - source-health information
 - action recommendations
 - runtime telemetry
-- user feedback
+- contextual user feedback
+- feedback-calibration audit metrics
+
+For a KPI with a completed analysis, open:
+
+```text
+KPI Detail
+    -> System & Audit
+        -> Feedback
+```
+
+When calibration metadata is available, the dashboard displays:
+
+```text
+Feedback samples
+Readiness adjustment
+Adjusted readiness
+```
+
+The dashboard deliberately labels adjusted readiness as an **operational calibration only**. Evidence confidence remains unchanged.
 
 ---
 
 ## Feedback
 
-The current application records user feedback separately from analytical evidence in `app.user_feedback`.
+The application now records **contextual feedback** in `app.user_feedback`.
 
-The present design intentionally prevents raw user feedback from rewriting current RCA evidence.
+Each rating is stored with:
 
-A governed feedback-learning layer can use reviewed feedback to influence future pipeline decisions while preserving deterministic source facts and preventing self-reinforcing model behavior.
+```text
+created_at
+persona
+region
+kpi
+window_start
+primary_driver
+action_level
+disposition
+comment_text
+is_demo
+```
+
+This makes feedback reusable by a future pipeline or downstream refresh without weakening the analytical boundary.
+
+A dashboard rating does **not** rewrite the current page in-place. It becomes eligible only on a later pipeline/feedback-refresh execution because the feedback engine enforces a strict execution-time cutoff.
+
+### Real user feedback flow
+
+```mermaid
+flowchart LR
+    A[Completed Decision] --> B[Streamlit Feedback Form]
+    B --> C[(app.user_feedback)]
+    C --> D[Future Pipeline or Feedback Refresh]
+    D --> E[Feedback Engine]
+    E --> F[Bounded Readiness Calibration]
+```
+
+The production path excludes `is_demo = 1` rows by default.
+
+---
+
+## Feedback demonstration
+
+The repository intentionally includes a reproducible synthetic feedback demonstration so evaluators can verify that feedback is actually consumed by the pipeline while deterministic RCA remains unchanged.
+
+The demonstration utility is:
+
+```text
+data/generate_feedback_demo.py
+```
+
+The validator is:
+
+```text
+eval/validate_feedback_integration.py
+```
+
+The lightweight downstream refresh is:
+
+```text
+refresh_feedback_calibration.py
+```
+
+The demo generator chooses a completed decision programmatically; it does not hardcode a benchmark region, date, or scenario.
+
+### Prerequisites
+
+Run the database migration and complete at least one DEV pipeline run first:
+
+```powershell
+cmd /c "mysql -u root -p < sql\05_feedback_integration.sql"
+python -u -m src.pipeline
+```
+
+If deterministic RCA has already been computed, **do not rerun the full pipeline just to test feedback**. Use `refresh_feedback_calibration.py`.
+
+### A. Positive-feedback demonstration in the terminal
+
+Start from clean demo rows:
+
+```powershell
+python data\generate_feedback_demo.py --clear
+```
+
+Create eight synthetic `Helpful` ratings and store a deterministic before-snapshot:
+
+```powershell
+python data\generate_feedback_demo.py --sentiment positive --count 8 --snapshot
+```
+
+The command prints the selected:
+
+```text
+KPI
+region
+window_start
+primary_driver
+action_level
+```
+
+Enable demo consumption for the current shell:
+
+```powershell
+$env:ALETHEIA_FEEDBACK_INCLUDE_DEMO="1"
+```
+
+Apply only the downstream feedback layer:
+
+```powershell
+python .\refresh_feedback_calibration.py
+```
+
+Validate the result:
+
+```powershell
+python -m eval.validate_feedback_integration
+```
+
+A validated DEV example produced:
+
+```text
+Feedback applied: True
+Feedback samples: 8
+Feedback adjustment: +0.0615
+Base readiness: 0.45
+Adjusted readiness: 0.511538
+Driver evidence unchanged: True
+Decomposition unchanged: True
+PASS
+```
+
+The exact selected KPI/region can vary if the stored analysis set changes. The invariants are the important part: readiness moves, deterministic evidence does not.
+
+### B. Negative-feedback demonstration in the terminal
+
+Clear the positive demo rows:
+
+```powershell
+python data\generate_feedback_demo.py --clear
+```
+
+Create eight synthetic `Not helpful` ratings:
+
+```powershell
+python data\generate_feedback_demo.py --sentiment negative --count 8 --snapshot
+```
+
+Ensure demo feedback remains enabled:
+
+```powershell
+$env:ALETHEIA_FEEDBACK_INCLUDE_DEMO="1"
+```
+
+Refresh and validate:
+
+```powershell
+python .\refresh_feedback_calibration.py
+python -m eval.validate_feedback_integration
+```
+
+A validated DEV example produced:
+
+```text
+Feedback applied: True
+Feedback samples: 8
+Feedback adjustment: -0.0615
+Base readiness: 0.45
+Adjusted readiness: 0.388462
+Driver evidence unchanged: True
+Decomposition unchanged: True
+PASS
+```
+
+Together, the two runs demonstrate:
+
+```text
+Helpful history      -> readiness moves upward
+Not-helpful history  -> readiness moves downward
+
+while
+
+driver evidence      -> unchanged
+driver ranking       -> unchanged
+lag selection        -> unchanged
+decomposition        -> unchanged
+retrieval governance -> unchanged
+action identity      -> unchanged
+```
+
+### C. Inspect demonstration rows directly in MySQL
+
+```powershell
+mysql -u root -p app -e "SELECT feedback_id,created_at,persona,region,kpi,window_start,primary_driver,action_level,disposition,is_demo,comment_text FROM user_feedback ORDER BY feedback_id DESC LIMIT 15;"
+```
+
+Synthetic rows are visibly marked:
+
+```text
+persona    = Demo evaluator
+is_demo    = 1
+comment    = FEEDBACK_DEMO_...
+```
+
+### D. Verify the feedback mechanism on the Streamlit dashboard
+
+Keep demo feedback enabled in the same shell:
+
+```powershell
+$env:ALETHEIA_FEEDBACK_INCLUDE_DEMO="1"
+```
+
+Generate either the positive or negative demo and run the refresh:
+
+```powershell
+python data\generate_feedback_demo.py --clear
+python data\generate_feedback_demo.py --sentiment positive --count 8 --snapshot
+python .\refresh_feedback_calibration.py
+```
+
+Launch Streamlit from that same shell:
+
+```powershell
+streamlit run app.py
+```
+
+Use the target printed by `generate_feedback_demo.py`:
+
+1. Select the printed **region** in the sidebar.
+2. Open the printed **KPI** from the regional overview.
+3. Open **System & Audit**.
+4. Scroll to **Feedback**.
+5. Verify the three cards:
+   - **Feedback samples** — should show `8`.
+   - **Readiness adjustment** — positive feedback should show approximately `+6.2%`.
+   - **Adjusted readiness** — should reflect the bounded adjustment.
+6. Confirm that the decision explanation, driver evidence, decomposition, and recommendation remain the deterministic result.
+7. Use the feedback form to submit `Helpful`, `Not helpful`, or `Unclear`. Real UI submissions are stored with `is_demo = 0` and become eligible only on a later pipeline/refresh execution.
+
+To demonstrate the negative direction on the dashboard, repeat with:
+
+```powershell
+python data\generate_feedback_demo.py --clear
+python data\generate_feedback_demo.py --sentiment negative --count 8 --snapshot
+python .\refresh_feedback_calibration.py
+```
+
+Refresh the browser. The readiness adjustment should now be negative while the analytical explanation remains unchanged.
+
+### E. Clean up after the demonstration
+
+```powershell
+python data\generate_feedback_demo.py --clear
+Remove-Item Env:ALETHEIA_FEEDBACK_INCLUDE_DEMO -ErrorAction SilentlyContinue
+python .\refresh_feedback_calibration.py
+```
+
+Verify that no demo rows remain:
+
+```powershell
+mysql -u root -p app -e "SELECT COUNT(*) AS demo_rows FROM user_feedback WHERE is_demo = 1;"
+```
+
+Expected:
+
+```text
+demo_rows
+0
+```
+
+### What is committed to GitHub?
+
+The **reproducible demo mechanism** is committed:
+
+```text
+data/generate_feedback_demo.py
+eval/test_feedback_integration.py
+eval/validate_feedback_integration.py
+refresh_feedback_calibration.py
+src/feedback_engine.py
+sql/05_feedback_integration.sql
+```
+
+The generated snapshot under `data/generated/feedback_demo_snapshot.json` and local MySQL demo rows are intentionally **not** committed. Evaluators generate them on demand, keeping the repository reproducible and preventing synthetic feedback from contaminating the default application state.
 
 ---
 
@@ -738,6 +1263,12 @@ Future incident observations may not be used to fit historical models or select 
 
 ### No retrieval contamination
 External retrieval cannot modify `raw.*`, `mart.*`, detected changepoints, selected lags, or fitted model coefficients.
+
+### No feedback contamination
+Feedback is downstream of deterministic RCA. It cannot modify changepoints, selected lags, fitted evidence, decomposition, source health, retrieval routing, primary driver, action level, or recommendation identity. Feedback-store failure results in an exact no-op.
+
+### Demo isolation
+Rows marked `is_demo = 1` are excluded unless `ALETHEIA_FEEDBACK_INCLUDE_DEMO=1` is explicitly set for the current process.
 
 ### No ungrounded causality
 Statistical evidence is expressed as evidence or plausible explanation rather than definitive causal proof.
@@ -804,6 +1335,53 @@ That is intentional. Web retrieval is precision-gated and is only allowed when
 an externally resolvable hypothesis is already supported, material, properly
 grounded, and decision-relevant.
 
+### Feedback demo says `Feedback applied: False`
+
+First confirm that demonstration rows exist:
+
+```powershell
+mysql -u root -p app -e "SELECT kpi,region,window_start,primary_driver,action_level,disposition,is_demo FROM user_feedback WHERE is_demo = 1 ORDER BY feedback_id DESC;"
+```
+
+Then confirm demo rows are explicitly enabled in the same shell:
+
+```powershell
+$env:ALETHEIA_FEEDBACK_INCLUDE_DEMO="1"
+```
+
+Reapply only the feedback layer:
+
+```powershell
+python .\refresh_feedback_calibration.py
+python -m eval.validate_feedback_integration
+```
+
+Also ensure the current version of `src/feedback_engine.py` is installed; its analysis cutoff uses an absolute Unix timestamp for timezone-safe comparison with MySQL `TIMESTAMP`.
+
+### The dashboard does not show feedback-calibration cards
+
+The cards appear only for a completed KPI decision bundle. Run the pipeline at least once, or if the deterministic analysis already exists, run:
+
+```powershell
+python .\refresh_feedback_calibration.py
+```
+
+Then reopen the target KPI and go to:
+
+```text
+System & Audit -> Feedback
+```
+
+### Do I need to rerun the full pipeline after changing feedback?
+
+No. For feedback-only changes use:
+
+```powershell
+python .\refresh_feedback_calibration.py
+```
+
+This does not recompute changepoints, lag search, driver evidence, decomposition, or retrieval.
+
 ### Generated benchmark files are missing from Git
 
 That is intentional. `data/generated/` is reproducible and gitignored. Recreate
@@ -828,14 +1406,34 @@ Refresh Stage-4 policy:
 python refresh_stage4_policy.py
 ```
 
+Refresh **only** downstream feedback calibration:
+
+```bash
+python refresh_feedback_calibration.py
+```
+
+Generate reproducible evaluator feedback:
+
+```bash
+python data/generate_feedback_demo.py --sentiment positive --count 8 --snapshot
+python data/generate_feedback_demo.py --sentiment negative --count 8 --snapshot
+python data/generate_feedback_demo.py --clear
+```
+
+The feedback refresh is the preferred tool when deterministic RCA has not changed.
+
 ---
 
 ## Status
 
 ```text
-RCA methodology: V4
-Retrieval precision policy: V4.1
-Regression suite: 44 / 44 passing
+RCA methodology:                 V4
+Retrieval precision policy:      V4.1
+Feedback calibration:            implemented, downstream-only, bounded ±0.10
+Core regression baseline:        44 / 44 passing
+Feedback integration unit tests: 10 / 10 passing
+Feedback positive demo:          PASS
+Feedback negative demo:          PASS
 ```
 
 ---
