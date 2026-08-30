@@ -1,0 +1,257 @@
+version: 2
+
+defaults:
+  owner: Business owner
+  increased:
+    next_check: "Identify which operational sub-segment produced the increase and verify that the movement is real rather than a reporting or mix effect."
+    action_if_confirmed: "Correct or contain the confirmed operational change, then monitor the KPI response."
+    hidden_check: "Break the signal down by product, channel, cohort, and region to look for offsetting sub-segment changes hidden by the aggregate."
+  decreased:
+    next_check: "Identify which operational sub-segment produced the decrease and verify that the movement is real rather than a reporting or mix effect."
+    action_if_confirmed: "Restore or correct the confirmed operational driver, then monitor the KPI response."
+    hidden_check: "Break the signal down by product, channel, cohort, and region to look for offsetting sub-segment changes hidden by the aggregate."
+  unchanged:
+    next_check: "Do not change this lever from the aggregate signal alone. Break it into operational sub-segments and check whether offsetting movements are hiding a localized issue."
+    action_if_confirmed: "Act only on the sub-segment where a real operational change is confirmed."
+    hidden_check: "Break the aggregate into product, channel, cohort, and region views to look for localized movement that cancels out at the total level."
+
+playbooks:
+  stock_availability:
+    label: Stock availability
+    owner: Supply / Inventory
+    decreased:
+      next_check: "Check SKU-level stock-outs, replenishment delays, allocation constraints, warehouse availability, and fulfillment capacity in the affected region."
+      action_if_confirmed: "Rebalance inventory or accelerate replenishment before increasing demand-generation activity."
+      hidden_check: "Check SKU- and warehouse-level availability; an aggregate availability rate can hide localized stock-outs."
+    increased:
+      next_check: "Check whether inventory built up because demand weakened, allocation shifted, or replenishment overshot."
+      action_if_confirmed: "Correct excess allocation or replenishment and update demand planning for the affected products."
+      hidden_check: "Break availability down by SKU and warehouse to distinguish useful stock recovery from excess inventory build-up."
+    unchanged:
+      next_check: "Do not change inventory policy from the aggregate availability rate alone. Check SKU-level stock-outs, allocation, and fulfillment bottlenecks."
+      action_if_confirmed: "Correct only the localized inventory constraint that is confirmed."
+      hidden_check: "Check SKU-level stock-outs, allocation, and fulfillment bottlenecks because aggregate availability can remain stable while important products are unavailable."
+
+  marketing_spend:
+    label: Marketing spend
+    owner: Growth / Marketing
+    decreased:
+      next_check: "Check campaign pauses, budget cuts, pacing limits, channel outages, and tracking gaps by channel and campaign."
+      action_if_confirmed: "Restore only the efficient campaigns or channels where reduced acquisition activity is confirmed to have driven the demand loss."
+      hidden_check: "Break spend down by campaign and channel; total spend can look stable while budget shifts away from productive acquisition."
+    increased:
+      next_check: "Identify which campaigns and channels received more spend and compare the added traffic, orders, and new customers they produced."
+      action_if_confirmed: "Reallocate or pause inefficient incremental spend before adding more budget."
+      hidden_check: "Break spend down by campaign and channel to find whether productive and unproductive changes cancelled out in the total."
+    unchanged:
+      next_check: "Do not change the total marketing budget from this signal alone. Check channel mix, campaign delivery, and tracking quality for offsetting shifts."
+      action_if_confirmed: "Adjust only the channel or campaign where a real efficiency or delivery problem is confirmed."
+      hidden_check: "Check channel mix, campaign delivery, and tracking quality; aggregate spend can be stable while the mix changes materially."
+
+  competitor_price_index:
+    label: Competitor pricing
+    owner: Pricing / Commercial
+    decreased:
+      next_check: "Review the product-level and regional price gap to confirm whether competitors became meaningfully cheaper on comparable offers."
+      action_if_confirmed: "Choose the narrowest response supported by the gap: pricing, promotion, packaging, or value-positioning rather than a blanket price cut."
+      hidden_check: "Check competitor pricing by product and segment; an aggregate index can hide targeted repricing."
+    increased:
+      next_check: "Verify the product-level price gap and whether demand changed as competitors became relatively more expensive."
+      action_if_confirmed: "Protect margin unless demand evidence supports a deliberate pricing or positioning change."
+      hidden_check: "Check product-level competitor moves before treating the aggregate index as a commercial opportunity."
+    unchanged:
+      next_check: "Do not change your own price from the aggregate competitor index alone. Check product-level competitor promotions, launches, and repricing."
+      action_if_confirmed: "Respond only to the product or segment where a material competitive move is confirmed."
+      hidden_check: "Check product-level competitor promotions and repricing because targeted moves can be hidden by a stable aggregate index."
+
+  average_discount_pct:
+    label: Discount level
+    owner: Pricing / Commercial
+    decreased:
+      next_check: "Review promotion-rule changes, campaign discounts, and product mix to see where discounting was reduced."
+      action_if_confirmed: "Restore or redesign only the promotion where lower discounting is confirmed to have damaged demand or mix."
+      hidden_check: "Break discounts down by product and campaign to look for offsetting promotion changes hidden by the average."
+    increased:
+      next_check: "Audit promotion rules, campaign discounts, and product mix to identify where discounting increased."
+      action_if_confirmed: "Correct unintended discounting and keep only promotions that justify their revenue-versus-margin trade-off."
+      hidden_check: "Break discounting down by product and campaign because the average can hide concentrated price erosion."
+    unchanged:
+      next_check: "Do not change the overall discount rate. Check product mix and promotion-level discount changes instead."
+      action_if_confirmed: "Adjust only the product or promotion where a material pricing change is confirmed."
+      hidden_check: "Check product mix and promotion-level discounts because offsetting changes can leave the average stable."
+
+  platform_uptime_pct:
+    label: Platform uptime
+    owner: Engineering / Reliability
+    decreased:
+      next_check: "Review incident logs, deployments, dependency failures, error rates, and regional/service-level availability during the period."
+      action_if_confirmed: "Fix the reliability issue and verify service recovery before treating the downstream customer problem as a pricing or retention issue."
+      hidden_check: "Check regional, service-level, and customer-cohort incidents because an overall uptime average can hide localized failures."
+    increased:
+      next_check: "Confirm whether the improvement is broad or whether localized service failures still occurred in the affected customer cohort."
+      action_if_confirmed: "Keep the reliability improvement in place and move the investigation to the next customer-experience driver."
+      hidden_check: "Check localized service incidents before ruling reliability out completely."
+    unchanged:
+      next_check: "Do not prioritize a broad reliability intervention from the aggregate uptime figure. Check localized incidents, error rates, and affected customer cohorts."
+      action_if_confirmed: "Fix only the localized reliability issue if one is confirmed; otherwise move to the next customer-experience driver."
+      hidden_check: "Check localized incidents, error rates, and affected customer cohorts because broad uptime can remain stable while a subset of users experiences failures."
+
+  support_ticket_volume:
+    label: Support-ticket volume
+    owner: Customer Support / Product
+    increased:
+      next_check: "Triage the ticket spike by issue category, product area, severity, and customer cohort to find the recurring service or product problem."
+      action_if_confirmed: "Assign an owner to remove the dominant underlying issue before changing retention incentives or support staffing broadly."
+      hidden_check: "Check ticket mix and severity; total ticket volume can be stable while a high-impact issue category spikes."
+    decreased:
+      next_check: "Verify whether lower ticket volume reflects genuinely better customer experience or a reporting, routing, or contact-channel problem."
+      action_if_confirmed: "Preserve the service improvement if real; repair the reporting or access issue if demand was merely hidden."
+      hidden_check: "Check contact-channel and issue-category mix before treating lower ticket volume as improved experience."
+    unchanged:
+      next_check: "Do not change support staffing from the total ticket count alone. Check issue severity, category mix, and affected cohorts."
+      action_if_confirmed: "Fix the concentrated issue category if a meaningful spike is found."
+      hidden_check: "Check issue severity and category mix because a severe customer problem can be hidden by stable total ticket volume."
+
+  conversion_rate:
+    label: Conversion rate
+    owner: Growth / Product
+    decreased:
+      next_check: "Inspect funnel drop-off by channel, device, landing page, checkout step, payment errors, and customer cohort."
+      action_if_confirmed: "Fix the highest-loss funnel step before increasing acquisition spend."
+      hidden_check: "Break conversion down by channel, device, landing page, and cohort because aggregate conversion can hide a concentrated funnel failure."
+    increased:
+      next_check: "Identify which funnel step, channel, or customer cohort drove the improvement and verify that order quality also held."
+      action_if_confirmed: "Preserve the improvement and scale acquisition only where conversion quality remains strong."
+      hidden_check: "Check segment-level conversion before treating the aggregate improvement as universal."
+    unchanged:
+      next_check: "Do not redesign the funnel from aggregate conversion alone. Check channel, device, landing-page, and cohort conversion for offsetting changes."
+      action_if_confirmed: "Fix only the segment where a real conversion loss is confirmed."
+      hidden_check: "Check channel, device, landing-page, and cohort conversion because gains and losses can cancel in the aggregate."
+
+  sessions:
+    label: Sessions
+    owner: Growth / Marketing
+    decreased:
+      next_check: "Check traffic-source losses, campaign delivery, SEO/referral changes, tracking instrumentation, and channel outages."
+      action_if_confirmed: "Restore the affected traffic source only after confirming the session decline is real and the traffic remains valuable."
+      hidden_check: "Break sessions down by source and campaign because stable total traffic can hide a loss in a high-value channel."
+    increased:
+      next_check: "Identify which channels produced the additional traffic and verify whether conversion and customer quality held."
+      action_if_confirmed: "Scale only the traffic sources that preserve conversion and customer quality."
+      hidden_check: "Check traffic-source mix to distinguish useful growth from low-quality volume."
+    unchanged:
+      next_check: "Do not change total traffic acquisition from aggregate sessions alone. Check traffic-source and campaign mix."
+      action_if_confirmed: "Correct only the source where a real traffic loss or quality problem is confirmed."
+      hidden_check: "Check traffic-source and campaign mix because offsetting channel changes can leave total sessions stable."
+
+  orders:
+    label: Orders
+    owner: Commerce / Product
+    decreased:
+      next_check: "Inspect conversion, checkout errors, payment failures, product availability, and channel mix to find the largest verified order-loss point."
+      action_if_confirmed: "Fix that loss point before changing acquisition budgets."
+      hidden_check: "Break orders down by product, channel, and checkout stage to look for concentrated losses."
+    increased:
+      next_check: "Identify the product, channel, or funnel change behind the higher order volume and verify fulfillment capacity."
+      action_if_confirmed: "Preserve the winning change and scale only if fulfillment can support it."
+      hidden_check: "Check product and channel mix before scaling from aggregate order growth."
+    unchanged:
+      next_check: "Do not change total order-generation strategy. Check product mix, channel mix, and checkout-stage performance."
+      action_if_confirmed: "Fix only the segment where a real order-flow issue is confirmed."
+      hidden_check: "Check product and channel mix because offsetting movements can leave total orders stable."
+
+  new_customers:
+    label: New customers
+    owner: Growth / Marketing
+    decreased:
+      next_check: "Inspect acquisition-channel performance, conversion, offer competitiveness, onboarding friction, and new-customer tracking."
+      action_if_confirmed: "Fix the largest verified acquisition loss before increasing total spend."
+      hidden_check: "Break new customers down by channel and cohort because aggregate acquisition can hide a channel-specific loss."
+    increased:
+      next_check: "Identify which channel, offer, or funnel change produced the improvement and verify downstream customer quality."
+      action_if_confirmed: "Scale the winning acquisition source only if customer quality remains acceptable."
+      hidden_check: "Check channel and cohort quality before scaling aggregate acquisition growth."
+    unchanged:
+      next_check: "Do not change the total acquisition plan. Check channel mix, conversion, and cohort quality for offsetting changes."
+      action_if_confirmed: "Adjust only the acquisition segment where a real issue is confirmed."
+      hidden_check: "Check channel and cohort mix because stable total acquisition can hide a material segment shift."
+
+  units_sold:
+    label: Units sold
+    owner: Commercial / Operations
+    decreased:
+      next_check: "Separate demand loss from fulfillment loss by checking stock availability, order flow, product mix, and regional demand."
+      action_if_confirmed: "Fix the confirmed demand or fulfillment constraint before changing unrelated pricing or marketing levers."
+      hidden_check: "Break units sold down by product and region to distinguish broad demand weakness from localized fulfillment loss."
+    increased:
+      next_check: "Identify whether higher volume came from stronger demand, promotions, or improved availability, and verify inventory capacity."
+      action_if_confirmed: "Preserve the confirmed demand or availability improvement while protecting inventory capacity."
+      hidden_check: "Check product and regional mix before treating aggregate volume growth as broad-based."
+    unchanged:
+      next_check: "Do not change broad volume levers. Check product and regional mix and the other KPI component."
+      action_if_confirmed: "Act only on the segment or other KPI component where movement is confirmed."
+      hidden_check: "Check product and regional mix because offsetting volume changes can leave total units stable."
+
+  total_active_customers:
+    label: Active customers
+    owner: Customer Success / Growth
+    decreased:
+      next_check: "Review retention cohorts, reactivation, onboarding, and customer inactivity to identify where active customers were lost."
+      action_if_confirmed: "Fix the confirmed lifecycle loss point before launching broad retention offers."
+      hidden_check: "Break active customers down by cohort and tenure because aggregate totals can hide a concentrated lifecycle loss."
+    increased:
+      next_check: "Identify the cohort or lifecycle change responsible for the larger active base and verify that engagement quality held."
+      action_if_confirmed: "Preserve the successful lifecycle change before scaling retention investment."
+      hidden_check: "Check cohort mix before treating aggregate active-customer growth as universal."
+    unchanged:
+      next_check: "Do not change retention strategy from the aggregate active-customer count. Check cohort and tenure mix."
+      action_if_confirmed: "Act only on the lifecycle segment where a real movement is confirmed."
+      hidden_check: "Check cohort and tenure mix because offsetting retention changes can leave the total stable."
+
+  churned_customers:
+    label: Churned customers
+    owner: Customer Success / Product
+    increased:
+      next_check: "Segment churn by cohort, product, tenure, and reason, then trace the increase to the strongest operational driver."
+      action_if_confirmed: "Fix the dominant experience or service problem before using broad pricing or retention incentives."
+      hidden_check: "Check churn reason and cohort mix because stable total churn can hide a concentrated problem."
+    decreased:
+      next_check: "Identify which retention or experience improvement reduced churn and verify that it is durable."
+      action_if_confirmed: "Preserve the confirmed improvement and scale it only to comparable cohorts."
+      hidden_check: "Check cohort and reason mix before attributing the reduction to one broad policy."
+    unchanged:
+      next_check: "Do not change retention policy from the total churn count. Check churn reason, cohort, and denominator mix."
+      action_if_confirmed: "Act only on the cohort or reason where a real increase is confirmed."
+      hidden_check: "Check churn reason and cohort mix because offsetting changes can leave total churn stable."
+
+  average_selling_price:
+    label: Average selling price
+    owner: Pricing / Commercial
+    decreased:
+      next_check: "Review price changes, discounting, product mix, and competitor pricing to identify the source of price erosion."
+      action_if_confirmed: "Correct unintended price erosion before using additional demand-generation spend to offset the revenue gap."
+      hidden_check: "Break selling price down by product and region because mix changes can hide targeted price erosion."
+    increased:
+      next_check: "Determine whether the higher selling price came from deliberate pricing, lower discounting, or product mix, and verify demand impact."
+      action_if_confirmed: "Preserve the pricing or mix improvement only if demand remains healthy."
+      hidden_check: "Check product and regional price mix before treating the aggregate increase as a broad pricing effect."
+    unchanged:
+      next_check: "Do not change broad pricing from the aggregate selling price. Check product mix, regional pricing, and discounting."
+      action_if_confirmed: "Adjust only the product or segment where a material pricing issue is confirmed."
+      hidden_check: "Check product mix, regional pricing, and discounting because offsetting changes can leave average selling price stable."
+
+  weather_index:
+    label: Weather disruption
+    owner: Operations / Business Continuity
+    decreased:
+      next_check: "Validate whether weather conditions disrupted demand, logistics, staffing, transport, or fulfillment in the affected area."
+      action_if_confirmed: "Use continuity measures on the affected operation rather than changing unrelated commercial levers."
+      hidden_check: "Check location-specific weather and operational disruption before attributing the KPI movement to a broad weather index."
+    increased:
+      next_check: "Validate whether weather conditions disrupted demand, logistics, staffing, transport, or fulfillment in the affected area."
+      action_if_confirmed: "Use continuity measures on the affected operation rather than changing unrelated commercial levers."
+      hidden_check: "Check location-specific weather and operational disruption before attributing the KPI movement to a broad weather index."
+    unchanged:
+      next_check: "Do not attribute the KPI movement to weather from a stable index. Check location-specific conditions only if there is grounded external evidence."
+      action_if_confirmed: "Use continuity measures only for a verified local disruption."
+      hidden_check: "Check location-specific conditions only when a real external anchor exists; otherwise move to internal drivers."

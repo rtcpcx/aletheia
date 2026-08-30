@@ -1,0 +1,13 @@
+beautifulsoup4
+ddgs
+mysql-connector-python
+numpy
+ollama
+pandas
+pyyaml
+requests
+ruptures
+scikit-learn
+scipy
+statsmodels
+streamlit

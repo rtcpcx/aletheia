@@ -1,0 +1,155 @@
+version: 1
+defaults:
+  unknown_scope: internal
+  # Public retrieval is for discriminating meaningful competing hypotheses,
+  # not for web-searching every externally searchable driver that happens to
+  # have a non-zero statistical weight.
+  public_candidate_min_weight: 0.15
+  public_candidate_min_evidence_score: 0.05
+  public_competing_min_weight: 0.15
+  public_require_competing_hypothesis: true
+hypotheses:
+  units_sold:
+    retrieval_scope: internal
+  marketing_spend:
+    retrieval_scope: internal
+  stock_availability:
+    retrieval_scope: internal
+  average_discount_pct:
+    retrieval_scope: internal
+  conversion_rate:
+    retrieval_scope: internal
+  new_customers:
+    retrieval_scope: internal
+  support_ticket_volume:
+    retrieval_scope: internal
+  platform_uptime_pct:
+    retrieval_scope: internal
+  total_active_customers:
+    retrieval_scope: internal
+  churned_customers:
+    retrieval_scope: internal
+  sessions:
+    retrieval_scope: internal
+  orders:
+    retrieval_scope: internal
+  average_selling_price:
+    retrieval_scope: internal
+  weather_index:
+    retrieval_scope: external
+    external_hypothesis: weather_disruption
+    query_terms:
+    - weather
+    - rainfall
+    - rain
+    - storm
+    - cyclone
+    - flood
+    - flooding
+    - disruption
+    verification_mode: corroborate_if_material
+    verification_min_abs_zscore: 3.0
+    verification_min_structural_break: 0.15
+    verification_min_weight: 0.05
+  competitor_price_index:
+    retrieval_scope: conditional_external
+    external_hypothesis: competitor_action
+    required_anchor_any:
+    - competitor
+    - competitor_name
+    query_terms:
+    - competitor
+    - price
+    - pricing
+    - discount
+    - promotion
+    - launch
+    - repricing
+  weather_disruption:
+    retrieval_scope: external
+    external_hypothesis: weather_disruption
+    query_terms:
+    - weather
+    - rainfall
+    - rain
+    - storm
+    - cyclone
+    - flood
+    - flooding
+    - disruption
+    verification_mode: corroborate_if_material
+    verification_min_abs_zscore: 3.0
+    verification_min_structural_break: 0.15
+    verification_min_weight: 0.05
+  local_event_disruption:
+    retrieval_scope: external
+    external_hypothesis: local_event_disruption
+    query_terms:
+    - event
+    - closure
+    - shutdown
+    - strike
+    - protest
+    - disruption
+    verification_mode: corroborate_if_material
+    verification_min_abs_zscore: 3.0
+    verification_min_structural_break: 0.15
+    verification_min_weight: 0.05
+  transport_disruption:
+    retrieval_scope: external
+    external_hypothesis: transport_disruption
+    query_terms:
+    - transport
+    - traffic
+    - road
+    - rail
+    - airport
+    - closure
+    - logistics
+    - disruption
+    verification_mode: corroborate_if_material
+    verification_min_abs_zscore: 3.0
+    verification_min_structural_break: 0.15
+    verification_min_weight: 0.05
+  macroeconomic_pressure:
+    retrieval_scope: external
+    external_hypothesis: macroeconomic_pressure
+    query_terms:
+    - inflation
+    - interest
+    - rates
+    - economy
+    - demand
+    - macroeconomic
+    verification_mode: corroborate_if_material
+    verification_min_abs_zscore: 3.0
+    verification_min_structural_break: 0.15
+    verification_min_weight: 0.05
+  regulatory_change:
+    retrieval_scope: external
+    external_hypothesis: regulatory_change
+    query_terms:
+    - regulation
+    - regulatory
+    - policy
+    - tax
+    - tariff
+    - compliance
+    - rule
+    verification_mode: corroborate_if_material
+    verification_min_abs_zscore: 3.0
+    verification_min_structural_break: 0.15
+    verification_min_weight: 0.05
+  competitor_action:
+    retrieval_scope: conditional_external
+    external_hypothesis: competitor_action
+    required_anchor_any:
+    - competitor
+    - competitor_name
+    query_terms:
+    - competitor
+    - price
+    - pricing
+    - promotion
+    - launch
+    - repricing

@@ -1,0 +1,195 @@
+# Aletheia — KPI contracts with V4 generic cadence + mechanism semantics.
+# No region/date/scenario-specific rules. Direction semantics are business-contract metadata.
+
+revenue:
+  formula: revenue = units_sold * average_selling_price
+  components:
+  - name: units_sold
+    table: mart.daily_kpi_evidence
+    column: units_sold
+  - name: average_selling_price
+    table: mart.daily_kpi_evidence
+    column: average_selling_price
+  root_drivers:
+  - name: competitor_price_index
+    table: mart.daily_kpi_evidence
+    column: competitor_price_index
+    explains: average_selling_price
+    max_lag: 14
+    source_cadence_days: 7
+    causal_role: context
+    expected_effect_sign: positive
+  - name: marketing_spend
+    table: mart.daily_kpi_evidence
+    column: marketing_spend
+    explains: units_sold
+    max_lag: 7
+    source_cadence_days: 1
+    causal_role: direct
+    expected_effect_sign: positive
+  - name: stock_availability
+    table: mart.daily_kpi_evidence
+    column: stock_availability
+    explains: units_sold
+    max_lag: 3
+    source_cadence_days: 1
+    causal_role: direct
+    expected_effect_sign: positive
+  - name: weather_index
+    table: mart.daily_kpi_evidence
+    column: weather_index
+    explains: units_sold
+    max_lag: 7
+    source_cadence_days: 7
+    causal_role: context
+    expected_effect_sign: positive
+  - name: average_discount_pct
+    table: mart.daily_kpi_evidence
+    column: average_discount_pct
+    explains: average_selling_price
+    max_lag: 0
+    source_cadence_days: 1
+    causal_role: direct
+    expected_effect_sign: negative
+conversion_rate:
+  formula: conversion_rate = orders / sessions
+  components:
+  - name: orders
+    table: mart.daily_kpi_evidence
+    column: orders
+  - name: sessions
+    table: mart.daily_kpi_evidence
+    column: sessions
+  root_drivers:
+  - name: competitor_price_index
+    table: mart.daily_kpi_evidence
+    column: competitor_price_index
+    explains: orders
+    max_lag: 14
+    source_cadence_days: 7
+    causal_role: context
+    expected_effect_sign: positive
+  - name: stock_availability
+    table: mart.daily_kpi_evidence
+    column: stock_availability
+    explains: orders
+    max_lag: 3
+    source_cadence_days: 1
+    causal_role: direct
+    expected_effect_sign: positive
+  - name: weather_index
+    table: mart.daily_kpi_evidence
+    column: weather_index
+    explains: orders
+    max_lag: 7
+    source_cadence_days: 7
+    causal_role: context
+    expected_effect_sign: positive
+  - name: marketing_spend
+    table: mart.daily_kpi_evidence
+    column: marketing_spend
+    explains: sessions
+    max_lag: 3
+    source_cadence_days: 1
+    causal_role: direct
+    expected_effect_sign: positive
+customer_acquisition_cost:
+  formula: customer_acquisition_cost = marketing_spend / new_customers
+  components:
+  - name: marketing_spend
+    table: mart.daily_kpi_evidence
+    column: marketing_spend
+  - name: new_customers
+    table: mart.daily_kpi_evidence
+    column: new_customers
+  root_drivers:
+  - name: competitor_price_index
+    table: mart.daily_kpi_evidence
+    column: competitor_price_index
+    explains: new_customers
+    max_lag: 14
+    source_cadence_days: 7
+    causal_role: context
+    expected_effect_sign: positive
+  - name: conversion_rate
+    table: mart.daily_kpi_evidence
+    column: conversion_rate
+    explains: new_customers
+    max_lag: 0
+    source_cadence_days: 1
+    causal_role: direct
+    expected_effect_sign: positive
+  - name: weather_index
+    table: mart.daily_kpi_evidence
+    column: weather_index
+    explains: new_customers
+    max_lag: 7
+    source_cadence_days: 7
+    causal_role: context
+    expected_effect_sign: positive
+stock_availability:
+  formula: stock_availability (single metric)
+  components:
+  - name: stock_availability
+    table: mart.daily_kpi_evidence
+    column: stock_availability
+  root_drivers:
+  - name: units_sold
+    table: mart.daily_kpi_evidence
+    column: units_sold
+    explains: stock_availability
+    max_lag: 0
+    source_cadence_days: 1
+    causal_role: direct
+    expected_effect_sign: unknown
+  - name: marketing_spend
+    table: mart.daily_kpi_evidence
+    column: marketing_spend
+    explains: stock_availability
+    max_lag: 3
+    source_cadence_days: 1
+    causal_role: direct
+    expected_effect_sign: unknown
+  - name: weather_index
+    table: mart.daily_kpi_evidence
+    column: weather_index
+    explains: stock_availability
+    max_lag: 7
+    source_cadence_days: 7
+    causal_role: context
+    expected_effect_sign: unknown
+churn_rate:
+  formula: churn_rate = churned_customers / total_active_customers
+  components:
+  - name: churned_customers
+    table: mart.daily_kpi_evidence
+    column: churned_customers
+  - name: total_active_customers
+    table: mart.daily_kpi_evidence
+    column: total_active_customers
+  root_drivers:
+  - name: support_ticket_volume
+    table: mart.daily_kpi_evidence
+    column: support_ticket_volume
+    explains: churned_customers
+    max_lag: 10
+    source_cadence_days: 1
+    causal_role: direct
+    expected_effect_sign: positive
+  - name: platform_uptime_pct
+    table: mart.daily_kpi_evidence
+    column: platform_uptime_pct
+    explains: churned_customers
+    max_lag: 7
+    source_cadence_days: 1
+    causal_role: upstream
+    mediates_through: support_ticket_volume
+    expected_effect_sign: negative
+  - name: competitor_price_index
+    table: mart.daily_kpi_evidence
+    column: competitor_price_index
+    explains: churned_customers
+    max_lag: 21
+    source_cadence_days: 7
+    causal_role: context
+    expected_effect_sign: negative
