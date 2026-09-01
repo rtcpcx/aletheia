@@ -9,8 +9,8 @@ The core design principle is simple:
 > **LLMs and external retrieval may enrich interpretation, but they must never overwrite deterministic business evidence.**
 
 
-**Repository:** [github.com/rtcpc/aletheia](https://github.com/rtcpc/aletheia)  
-**Issues:** [GitHub Issues](https://github.com/rtcpc/aletheia/issues)
+**Repository:** [github.com/rtcpc/aletheia](https://github.com/rtcpcx/aletheia)  
+**Issues:** [GitHub Issues](https://github.com/rtcpcx/aletheia/issues)
 
 ## Table of contents
 
